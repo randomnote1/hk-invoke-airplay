@@ -1,0 +1,23 @@
+# Build artifacts
+build/
+*.o
+*.ko
+*.bin
+
+# Firmware images (too large for git)
+firmware/
+*.squashfs
+83_IMAGE*
+ExtractedImage/
+
+# Cross-compilation toolchain
+toolchain/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
