@@ -1,0 +1,48 @@
+# Cross-compilation environment for HK Invoke AirPlay speaker
+# Uses Debian Stretch (glibc 2.24) — closest match to device's glibc 2.23
+# Target: ARMv7 hard-float (Marvell Berlin), Linux 3.8.13
+#
+# Build:
+#   cd C:\Users\dareist\source\repos\hk-invoke-airplay
+#   docker build -t hk-invoke-build -f scripts/Dockerfile.build .
+#
+# Run:
+#   docker run --rm -v "${PWD}/build/output:/out" hk-invoke-build
+
+FROM debian:stretch-slim
+
+# Stretch is EOL — point to archive repos
+RUN echo 'deb http://archive.debian.org/debian stretch main' > /etc/apt/sources.list && \
+    echo 'deb http://archive.debian.org/debian-security stretch/updates main' >> /etc/apt/sources.list && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid
+
+# Install cross-compiler and build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    crossbuild-essential-armhf \
+    autoconf automake libtool pkg-config \
+    make git wget curl ca-certificates \
+    file bzip2 xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify cross-compiler and glibc version
+RUN arm-linux-gnueabihf-gcc --version | head -1 && \
+    echo "glibc:" && strings /usr/arm-linux-gnueabihf/lib/libc.so.6 | grep "GLIBC_" | sort -V | tail -3
+
+# Set environment for the build script
+ENV PROJECT_DIR=/project
+ENV BUILD_DIR=/project/build
+
+# Create working directories
+RUN mkdir -p /project/build/src /project/build/staging/bin \
+    /project/build/sysroot/usr/lib/pkgconfig /project/build/sysroot/usr/include
+
+# Copy project source and scripts
+COPY src/ /project/src/
+COPY scripts/cross-compile.sh /project/scripts/cross-compile.sh
+RUN sed -i 's/\r$//' /project/scripts/cross-compile.sh && chmod +x /project/scripts/cross-compile.sh
+
+# Output volume — binaries will be copied here
+VOLUME /out
+
+# Build everything, then copy binaries to /out
+CMD ["/bin/bash", "-c", "/project/scripts/cross-compile.sh && cp -r /project/build/staging/* /out/ 2>/dev/null; echo 'Build artifacts copied to /out'"]
